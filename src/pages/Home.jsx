@@ -82,7 +82,7 @@ const Home = () => {
             viewport={{ once: true }}
           >
             <h2 className="text-4xl font-bold mb-4">
-              Why Choose <span className="gradient-text">Hedera Property Loans</span>?
+              Why Choose <span className="gradient-text">NotABank</span>?
             </h2>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
               Experience the future of property financing with blockchain technology

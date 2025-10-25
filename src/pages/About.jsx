@@ -50,7 +50,7 @@ const About = () => {
           transition={{ duration: 0.8 }}
         >
           <h1 className="text-5xl font-bold mb-6">
-            About <span className="gradient-text">Hedera Property Loans</span>
+            About <span className="gradient-text">NotABank</span>
           </h1>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
             Revolutionizing property financing through blockchain technology and smart contracts
