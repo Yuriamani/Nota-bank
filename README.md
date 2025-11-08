@@ -1,3 +1,6 @@
+**Hedera Team Certificates Link**
+https://drive.google.com/drive/folders/1abRcy4Lu7etjwUV4a3WzdgT-0ft87LEC?usp=sharing
+
 # Hedera Property Loans - Frontend Demo
 
 A beautiful, responsive React web app that simulates tokenized property loans on the Hedera network. Built for hackathon demonstration purposes.
@@ -132,3 +135,4 @@ This is a demo project, but suggestions and improvements are welcome!
 ---
 
 **Built for Hedera Network** - Demonstrating the future of tokenized property loans on blockchain.
+
