@@ -1,0 +1,28 @@
+{
+  "contracts": {
+    "propertyToken": {
+      "address": "YOUR_DEPLOYED_PROPERTY_TOKEN_ADDRESS",
+      "abi": "./abis/PropertyToken.json"
+    },
+    "propertyOracle": {
+      "address": "YOUR_DEPLOYED_ORACLE_ADDRESS",
+      "abi": "./abis/PropertyOracle.json"
+    },
+    "loanManager": {
+      "address": "YOUR_DEPLOYED_LOAN_MANAGER_ADDRESS",
+      "abi": "./abis/LoanManager.json"
+    }
+  },
+  "networks": {
+    "testnet": {
+      "nodeUrl": "https://testnet.hashio.io/api",
+      "mirrorNodeUrl": "https://testnet.mirrornode.hedera.com/api",
+      "chainId": "0x128"
+    },
+    "mainnet": {
+      "nodeUrl": "https://mainnet.hashio.io/api",
+      "mirrorNodeUrl": "https://mainnet.mirrornode.hedera.com/api",
+      "chainId": "0x127"
+    }
+  }
+}

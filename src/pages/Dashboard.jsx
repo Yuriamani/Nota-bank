@@ -1,20 +1,91 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { User, Building2, Plus, AlertCircle } from 'lucide-react'
 import PropertyCard from '../components/PropertyCard'
 import LoanCard from '../components/LoanCard'
 import LoanRequestModal from '../components/LoanRequestModal'
+import Toast from '../components/Toast'
+import ContractService from '../services/ContractService'
+import WalletService from '../services/WalletService'
+import TransactionService from '../services/TransactionService'
 
-const Dashboard = ({ 
-  properties, 
-  loans, 
-  walletConnected, 
-  walletAddress, 
-  onRequestLoan, 
-  onApproveLoan, 
-  onRepayLoan, 
-  onClaimCollateral 
-}) => {
+const contractService = ContractService.getInstance();
+const walletService = WalletService.getInstance();
+const transactionService = TransactionService.getInstance();
+
+const Dashboard = () => {
+  const [properties, setProperties] = useState([]);
+  const [loans, setLoans] = useState([]);
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [toasts, setToasts] = useState([]);
+
+  useEffect(() => {
+    checkWalletConnection();
+    loadDashboardData();
+  }, [walletConnected]);
+
+  const checkWalletConnection = async () => {
+    try {
+      const connected = walletService.isConnected();
+      setWalletConnected(connected);
+      if (connected) {
+        const accountInfo = await walletService.getAccountInfo();
+        setWalletAddress(accountInfo.accountId);
+      }
+    } catch (error) {
+      console.error('Error checking wallet connection:', error);
+      showToast('Failed to check wallet connection', 'error');
+    }
+  };
+
+  const loadDashboardData = async () => {
+    if (!walletConnected) return;
+    setIsLoading(true);
+    try {
+      // Load properties
+      const propertyCount = await contractService.getProperty('count');
+      const propertiesData = [];
+      for (let i = 1; i <= propertyCount; i++) {
+        const property = await contractService.getProperty(i);
+        if (property.owner === walletAddress) {
+          propertiesData.push({
+            id: i,
+            ...property
+          });
+        }
+      }
+      setProperties(propertiesData);
+
+      // Load loans
+      const loanCount = await contractService.getLoan('count');
+      const loansData = [];
+      for (let i = 1; i <= loanCount; i++) {
+        const loan = await contractService.getLoan(i);
+        if (loan.borrower === walletAddress || loan.status === 'pending') {
+          loansData.push({
+            id: i,
+            ...loan
+          });
+        }
+      }
+      setLoans(loansData);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      showToast('Failed to load dashboard data', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const showToast = (message, type = 'info') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, 5000);
+  };
   const [activeTab, setActiveTab] = useState('borrower')
   const [showLoanModal, setShowLoanModal] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState(null)
@@ -22,10 +93,88 @@ const Dashboard = ({
   const userLoans = loans.filter(loan => loan.borrower === walletAddress)
   const availableLoans = loans.filter(loan => loan.status === 'pending')
 
-  const handleRequestLoan = (propertyId, amount, duration) => {
-    onRequestLoan(propertyId, amount, duration)
-    setShowLoanModal(false)
-    setSelectedProperty(null)
+  const handleRequestLoan = async (propertyId, amount, duration) => {
+    try {
+      showToast('Processing loan request...', 'loading');
+      const txResponse = await contractService.requestLoan(propertyId, amount, duration);
+      
+      await transactionService.trackTransaction(txResponse,
+        () => {
+          showToast('Loan request submitted successfully', 'success');
+          loadDashboardData();
+          setShowLoanModal(false);
+          setSelectedProperty(null);
+        },
+        (error) => {
+          showToast('Transaction failed: ' + error, 'error');
+        }
+      );
+    } catch (error) {
+      console.error('Error requesting loan:', error);
+      showToast('Failed to request loan: ' + error.message, 'error');
+    }
+  }
+
+  const handleApproveLoan = async (loanId) => {
+    try {
+      showToast('Processing loan approval...', 'loading');
+      const loan = loans.find(l => l.id === loanId);
+      const txResponse = await contractService.approveLoan(loanId, loan.amount);
+      
+      await transactionService.trackTransaction(txResponse,
+        () => {
+          showToast('Loan approved successfully', 'success');
+          loadDashboardData();
+        },
+        (error) => {
+          showToast('Transaction failed: ' + error, 'error');
+        }
+      );
+    } catch (error) {
+      console.error('Error approving loan:', error);
+      showToast('Failed to approve loan: ' + error.message, 'error');
+    }
+  }
+
+  const handleRepayLoan = async (loanId) => {
+    try {
+      showToast('Processing loan repayment...', 'loading');
+      const loan = loans.find(l => l.id === loanId);
+      const txResponse = await contractService.repayLoan(loanId, loan.amount);
+      
+      await transactionService.trackTransaction(txResponse,
+        () => {
+          showToast('Loan repaid successfully', 'success');
+          loadDashboardData();
+        },
+        (error) => {
+          showToast('Transaction failed: ' + error, 'error');
+        }
+      );
+    } catch (error) {
+      console.error('Error repaying loan:', error);
+      showToast('Failed to repay loan: ' + error.message, 'error');
+    }
+  }
+
+  const handleClaimCollateral = async (loanId) => {
+    try {
+      showToast('Processing collateral claim...', 'loading');
+      const txResponse = await contractService.claimCollateral(loanId);
+      
+      await transactionService.trackTransaction(txResponse,
+        () => {
+          showToast('Collateral claimed successfully', 'success');
+          loadDashboardData();
+        },
+        (error) => {
+          showToast('Transaction failed: ' + error, 'error');
+        }
+      );
+    } catch (error) {
+      console.error('Error claiming collateral:', error);
+      showToast('Failed to claim collateral: ' + error.message, 'error');
+    }
   }
 
   const openLoanModal = (property) => {
@@ -55,6 +204,15 @@ const Dashboard = ({
   return (
     <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {toasts.map((toast) => (
+          <Toast
+            key={toast.id}
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+          />
+        ))}
+        
         {/* Header */}
         <motion.div
           className="mb-8"
@@ -118,7 +276,18 @@ const Dashboard = ({
               </div>
               
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {properties.map((property, index) => (
+                {isLoading ? (
+                  <div className="col-span-3 text-center py-12">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="inline-block"
+                    >
+                      <Building2 size={32} className="text-hedera-purple" />
+                    </motion.div>
+                    <p className="mt-4 text-gray-400">Loading properties...</p>
+                  </div>
+                ) : properties.map((property, index) => (
                   <motion.div
                     key={property.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -137,7 +306,18 @@ const Dashboard = ({
             {/* Your Loans */}
             <div>
               <h2 className="text-2xl font-bold mb-6">Your Loans</h2>
-              {userLoans.length > 0 ? (
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="inline-block"
+                  >
+                    <Building2 size={32} className="text-hedera-purple" />
+                  </motion.div>
+                  <p className="mt-4 text-gray-400">Loading loans...</p>
+                </div>
+              ) : userLoans.length > 0 ? (
                 <div className="space-y-4">
                   {userLoans.map((loan, index) => (
                     <motion.div
@@ -149,8 +329,8 @@ const Dashboard = ({
                       <LoanCard
                         loan={loan}
                         property={properties.find(p => p.id === loan.propertyId)}
-                        onRepay={() => onRepayLoan(loan.id)}
-                        onClaim={() => onClaimCollateral(loan.id)}
+                        onRepay={handleRepayLoan}
+                        onClaim={handleClaimCollateral}
                         isBorrower={true}
                       />
                     </motion.div>
@@ -178,7 +358,18 @@ const Dashboard = ({
           >
             <div>
               <h2 className="text-2xl font-bold mb-6">Available Loan Requests</h2>
-              {availableLoans.length > 0 ? (
+              {isLoading ? (
+                <div className="text-center py-12">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="inline-block"
+                  >
+                    <Building2 size={32} className="text-hedera-purple" />
+                  </motion.div>
+                  <p className="mt-4 text-gray-400">Loading available loans...</p>
+                </div>
+              ) : availableLoans.length > 0 ? (
                 <div className="space-y-4">
                   {availableLoans.map((loan, index) => (
                     <motion.div
@@ -190,8 +381,8 @@ const Dashboard = ({
                       <LoanCard
                         loan={loan}
                         property={properties.find(p => p.id === loan.propertyId)}
-                        onApprove={() => onApproveLoan(loan.id)}
-                        onClaim={() => onClaimCollateral(loan.id)}
+                        onApprove={handleApproveLoan}
+                        onClaim={handleClaimCollateral}
                         isBorrower={false}
                       />
                     </motion.div>
